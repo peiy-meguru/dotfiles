@@ -1,0 +1,6 @@
+[Hotkey]
+ModifierOnlyKeyTimeout=500
+[Hotkey/AltTriggerKeys]
+0=Shift_L
+[Behavior]
+ActiveByDefault=True

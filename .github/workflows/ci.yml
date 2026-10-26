@@ -1,0 +1,296 @@
+# ==============================================================================
+# CI —— GitHub Actions
+#
+# 设计原则
+#   1. 五层递进，失败时一眼看出是哪一类问题：
+#        vendor  物化是否与上游同步
+#        lint    格式 / shell / Lua 语法
+#        eval    整机闭包能不能求值
+#        build   真的能不能编出来
+#        vm-test 编出来的镜像能不能启动
+#   2. 真机 kotone 只求值、不构建 —— 它要编译 NVIDIA 内核模块，
+#      CI 里跑一次十几分钟且没有缓存价值。想跑就本地跑。
+#   3. vm-test 只在 main 和手动触发时跑（PR 上太慢）。
+#   4. 可调项都标了「改这里」。
+#
+# 本地等价命令（提交前自己跑一遍，比等 CI 快）
+#   ./pipeline/materialize.sh --check
+#   nix flake check
+#   nix eval --raw \
+#     .#nixosConfigurations.kotone.config.system.build.toplevel.drvPath
+#   nix build .#nixosConfigurations.kotone-vm.config.system.build.toplevel
+#   ./scripts/run-vm.sh        # 本地起 VM 看效果
+#
+# 关于 action 版本：下面全部按 commit SHA 固定（供应链安全），
+# 上一行注释是对应的 tag。升级由 .github/dependabot.yml 自动提 PR。
+# ==============================================================================
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+    # 只改文档时不跑（省掉一次 15 分钟的 vm-test）。
+    # PR 上不加这个：否则「必需的检查」可能永远不出现，把 PR 卡死。
+    paths-ignore:
+      - "**.md"
+      - "LICENSE"
+      - ".gitignore"
+  pull_request:
+  # 手动触发：Actions 页面 → Run workflow
+  workflow_dispatch:
+
+# 同一分支连续 push 时取消上一次。
+# 但 main 上不取消：vm-test 跑一半被新 push 打断就白跑了。
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+# 最小权限：整个流程只读仓库
+permissions:
+  contents: read
+
+env:
+  # 所有 job 共用：开 flakes
+  NIX_CONFIG: |
+    experimental-features = nix-command flakes
+    max-jobs = auto
+    cores = 0
+
+# 统一用 bash（GitHub 的 bash 自带 -eo pipefail，比默认 sh 严格）
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  # ----------------------------------------------------------------------------
+  # 0. 物化校验 —— vendor/ 是否还等于上游那个 commit
+  #
+  #    Nyxuri 不在 nixpkgs 里，它的所需部分被 pipeline/materialize.sh
+  #    提前落盘到 vendor/，构建期只读文件、不联网。
+  #    这一步重新拉一次上游做 diff，防止 vendor/ 被手改或忘记刷新。
+  # ----------------------------------------------------------------------------
+  vendor:
+    name: 物化校验
+    runs-on: ubuntu-latest # 改这里：自建 runner 就换 self-hosted
+    timeout-minutes: 10
+    steps:
+      # actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          # 只读仓库，不需要把 token 留在 .git/config 里
+          persist-credentials: false
+
+      - name: 校验 vendor/ 与上游一致
+        run: ./pipeline/materialize.sh --check
+
+  # ----------------------------------------------------------------------------
+  # 1. 静态检查 —— 对应 flake.nix 的 checks（格式 / shellcheck / Lua 语法）
+  #    这一步不碰配置求值，纯文本层面，几十秒。
+  # ----------------------------------------------------------------------------
+  lint:
+    name: 静态检查
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      # actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+
+      # cachix/install-nix-action@v30
+      - uses: cachix/install-nix-action@08dcb3a5e62fa31e2da3d490afc4176ef55ecd72
+        with:
+          # 不装 nixpkgs channel：本仓库只用 flake
+          nix_path: nixpkgs=unset
+
+      - name: nix flake check
+        run: nix flake check -L
+
+  # ----------------------------------------------------------------------------
+  # 2. 求值 —— 把每个 host 的整机闭包完整求值一遍
+  #
+  #    只算 drvPath，不构建。能抓到 90% 的配置错误：
+  #    选项拼错、包名不存在、模块之间冲突、assertion 不满足。
+  #    新增 host 时只改下面的矩阵。
+  # ----------------------------------------------------------------------------
+  eval:
+    name: 求值 ${{ matrix.host }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      # 一个 host 挂了，另一个继续跑完，方便一次看全
+      fail-fast: false
+      matrix:
+        host:
+          - kotone # 真机（RTX 5060 / dGPU 直连）
+          - kotone-vm # 测试 VM（disko 镜像）
+    steps:
+      # actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+
+      # cachix/install-nix-action@v30
+      - uses: cachix/install-nix-action@08dcb3a5e62fa31e2da3d490afc4176ef55ecd72
+        with:
+          nix_path: nixpkgs=unset
+
+      - name: 求值整机闭包
+        env:
+          # 走 env 而不是直接插值，避免表达式注入
+          HOST: ${{ matrix.host }}
+        run: |
+          nix eval --raw \
+            ".#nixosConfigurations.${HOST}.config.system.build.toplevel.drvPath"
+          echo "✓ ${HOST} 求值通过"
+
+  # ----------------------------------------------------------------------------
+  # 3. 构建 —— 真的把 VM 闭包构建出来
+  #
+  #    选 VM 而不是真机，因为：
+  #      * VM 不含 NVIDIA 内核模块，闭包几乎全在 cache.nixos.org 上；
+  #      * 真机的 nvidia-x11 要现编，CI 里不划算（本地构建即可）。
+  #
+  #    注意：vm-test 会再构建一次（job 之间不共享 Nix store）。
+  #    想省掉重复：接 Cachix（见下面 vm-test 里的注释段）。
+  # ----------------------------------------------------------------------------
+  build:
+    name: 构建 kotone-vm
+    runs-on: ubuntu-latest
+    needs: eval # 求值不过就不用浪费时间构建
+    timeout-minutes: 60
+    steps:
+      # actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+
+      # cachix/install-nix-action@v30
+      - uses: cachix/install-nix-action@08dcb3a5e62fa31e2da3d490afc4176ef55ecd72
+        with:
+          nix_path: nixpkgs=unset
+
+      # GitHub 的 ubuntu-latest 只有 ~14 GiB 空闲，NixOS 闭包容易撑爆。
+      # 删掉 runner 预装但本仓库用不到的大件。
+      # 换成更大的 runner（larger runner / self-hosted）后可删这一步。
+      - name: 腾出磁盘空间
+        run: |
+          sudo rm -rf \
+            /usr/share/dotnet \
+            /usr/local/lib/android \
+            /opt/ghc \
+            /opt/hostedtoolcache/CodeQL \
+            /usr/local/share/boost
+          sudo apt-get clean
+          df -h /
+
+      - name: 构建 VM 闭包
+        run: |
+          nix build --no-link -L \
+            ".#nixosConfigurations.kotone-vm.config.system.build.toplevel"
+          echo "✓ kotone-vm 构建通过"
+
+  # ----------------------------------------------------------------------------
+  # 4. VM 启动测试 —— 构建 disko 镜像，真启动一遍，等到登录提示
+  #
+  #    这一步证明「从 0 构建出来的镜像能开机」，而不只是「能编译」。
+  #    只在 main 和手动触发时跑：一次约 15 分钟，PR 上太慢。
+  #    想每个 PR 都跑：删掉下面的 if。
+  # ----------------------------------------------------------------------------
+  vm-test:
+    name: VM 启动测试
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.event_name != 'pull_request'
+    timeout-minutes: 60
+    steps:
+      # actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+
+      # cachix/install-nix-action@v30
+      - uses: cachix/install-nix-action@08dcb3a5e62fa31e2da3d490afc4176ef55ecd72
+        with:
+          nix_path: nixpkgs=unset
+
+      - name: 腾出磁盘空间
+        run: |
+          sudo rm -rf \
+            /usr/share/dotnet \
+            /usr/local/lib/android \
+            /opt/ghc \
+            /opt/hostedtoolcache/CodeQL \
+            /usr/local/share/boost
+          sudo apt-get clean
+          df -h /
+
+      # 可选：把本仓库自建的派生（vendor 管线产物、libinput 插件、
+      # nvidia-patchelf-fix 覆盖）推到 Cachix，第二次 CI 起就不用重编。
+      # 用法：仓库 Settings → Secrets 加 CACHIX_AUTH_TOKEN，再取消注释。
+      #
+      # # cachix/cachix-action@v15
+      # - uses: cachix/cachix-action@ad2ddac53f961de1989924296a1f236fcfbaa4fc
+      #   with:
+      #     name: <你的 cache 名>
+      #     authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
+
+      # 不加 --no-link：下一步要跑 ./result
+      - name: 构建 disko 镜像
+        run: |
+          CFG=.#nixosConfigurations.kotone-vm.config.system.build
+          nix build -L "$CFG.diskoImagesScript"
+          # 这个脚本以当前用户身份起 QEMU 做分区 + 安装，不在 Nix 沙箱里
+          ./result --build-memory 4096
+          ls -ls nixos-vm.raw
+
+      - name: 安装 QEMU 与 OVMF
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq qemu-system-x86 ovmf
+
+      # 有 KVM 就用 KVM（约 1 分钟），没有就退回 TCG（约 8 分钟）
+      - name: 启动并等待登录提示
+        run: |
+          set -euo pipefail
+          OVMF_CODE=/usr/share/OVMF/OVMF_CODE_4M.fd
+          OVMF_VARS=/usr/share/OVMF/OVMF_VARS_4M.fd
+          cp "$OVMF_VARS" /tmp/VARS.fd
+          qemu-system-x86_64 \
+            -accel kvm:tcg -cpu max -smp 4 -m 4096 \
+            -drive if=pflash,format=raw,readonly=on,file="$OVMF_CODE" \
+            -drive if=pflash,format=raw,file=/tmp/VARS.fd \
+            -drive file=nixos-vm.raw,if=virtio,format=raw,snapshot=on \
+            -display none -serial file:/tmp/boot.log \
+            -netdev user,id=n0 -device virtio-net-pci,netdev=n0 \
+            &
+          QPID=$!
+          ok=0
+          for _ in $(seq 1 180); do   # 180 × 5s = 15 分钟上限
+            if grep -q 'login:' /tmp/boot.log 2>/dev/null; then ok=1; break; fi
+            kill -0 "$QPID" 2>/dev/null || break
+            sleep 5
+          done
+          kill "$QPID" 2>/dev/null || true
+          wait "$QPID" 2>/dev/null || true
+          # 去掉 ANSI 颜色码，日志才好读
+          sed -i 's/\x1b\[[0-9;]*m//g' /tmp/boot.log
+          if [ "$ok" != 1 ]; then
+            echo "✗ 15 分钟内没等到登录提示，最后 60 行："
+            tail -60 /tmp/boot.log
+            exit 1
+          fi
+          echo "✓ 启动成功，已到登录提示"
+          echo "--- 启动过程中的失败单元（应为空）---"
+          grep -i 'failed' /tmp/boot.log || echo "(无)"
+
+      # 失败时把串口日志留下来，省得靠猜
+      # actions/upload-artifact@v4
+      - if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: vm-boot-log
+          path: /tmp/boot.log
+          if-no-files-found: ignore
+          retention-days: 7

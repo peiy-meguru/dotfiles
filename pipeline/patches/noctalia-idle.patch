@@ -1,0 +1,32 @@
+diff --git a/configs/noctalia/noctalia-config.toml b/configs/noctalia/noctalia-config.toml
+index 59174a8..2c68d0c 100644
+--- a/configs/noctalia/noctalia-config.toml
++++ b/configs/noctalia/noctalia-config.toml
+@@ -85,23 +85,24 @@ reserve_space = false
+ show_dots = true
+ smart_auto_hide = true
+ 
++# 无操作 30 分钟锁屏 → 31 分钟关屏 → 60 分钟锁屏并挂起
+ [idle]
+ behavior_order = [ "lock", "screen-off", "lock-and-suspend" ]
+ 
+     [idle.behavior.lock]
+     action = "lock"
+     enabled = true
+-    timeout = 300.0
++    timeout = 1800.0
+ 
+     [idle.behavior.lock-and-suspend]
+     action = "lock_and_suspend"
+     enabled = true
+-    timeout = 900.0
++    timeout = 3600.0
+ 
+     [idle.behavior.screen-off]
+     action = "screen_off"
+     enabled = true
+-    timeout = 360.0
++    timeout = 1860.0
+ 
+ [hooks]
+ theme_mode_changed = "nyxuri theme sync"

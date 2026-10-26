@@ -1,0 +1,37 @@
+patch:
+  schema_list:
+    - schema: wanxiang
+  menu/page_size: 6
+  key_binder/bindings:
+    __patch:
+      - key_bindings:/emacs_editing
+      - key_bindings:/numbered_mode_switch
+  switcher:
+    caption: 「万象状态面板」
+    hotkeys:
+      - Control+grave
+      - Control+Shift+grave
+    fold_options: true
+    abbreviate_options: true
+    option_list_separator: ' / '
+    save_options:
+      - ascii_punct
+      - s2t
+      - s2hk
+      - s2tw
+      - emoji
+      - full_shape
+      - context_reorder
+      - super_tips
+      - charset_filter
+      - chaifen_switch
+      - tone_display
+      - fuzhu_hint
+      - tone_hint
+      - full_pinyin
+      - english_chinese
+      - english
+      - search_single_char
+      - abbrev
+  ascii_composer/switch_key/Shift_L: noop
+  ascii_composer/switch_key/Shift_R: noop

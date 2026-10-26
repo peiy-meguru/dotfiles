@@ -1,0 +1,14 @@
+window-rule {
+    opacity 1.0
+    background-effect {
+        blur false
+        xray false
+    }
+}
+window-rule {
+    match is-focused=false
+    opacity 1.0
+}
+blur {
+    off
+}
