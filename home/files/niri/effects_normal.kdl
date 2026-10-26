@@ -1,0 +1,17 @@
+window-rule {
+    opacity 0.9
+    background-effect {
+        blur true
+        xray false
+    }
+}
+window-rule {
+    match is-focused=false
+    opacity 0.85
+}
+blur {
+    passes 3
+    offset 2.3
+    noise 0.001
+    saturation 2
+}

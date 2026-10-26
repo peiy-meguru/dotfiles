@@ -1,0 +1,30 @@
+# 顶部栏尺寸：缩小并收紧边距
+#
+# 上游 Nyxuri 的 [bar.bar] 是 margin_edge = 10 / scale = 1.1 / thickness = 36，
+# 这里改成 4 / 1.0 / 30 —— 栏更矮、贴边更近，配合 niri 的 gaps 8 让窗口区更大。
+#
+# 应用方式：materialize.sh 用 patch -p3 打在 configs/noctalia/ 上
+# 重新生成：改完上游后跑 ./pipeline/materialize.sh，再 diff 出新的补丁
+diff --git a/configs/noctalia/noctalia-config.toml b/configs/noctalia/noctalia-config.toml
+--- a/configs/noctalia/noctalia-config.toml
++++ b/configs/noctalia/noctalia-config.toml
+@@ -23,8 +23,8 @@
+ font_family = "JetBrains Mono"
+ font_weight = 600
+ margin_ends = 14
+-margin_edge = 10
+-scale = 1.1
++margin_edge = 4
++scale = 1.0
+ shadow = false
+ end = [
+     "media",
+@@ -35,7 +35,7 @@
+ ]
+ center = ["clock"]
+ start = ["launcher", "workspaces", "group:g1"]
+-thickness = 36
++thickness = 30
+ 
+ [[bar.bar.capsule_group]]
+ accordion = false

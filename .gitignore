@@ -1,0 +1,84 @@
+# ==============================================================================
+# .gitignore —— 只让「装系统用的 Nix 配置 + CI」入库
+#
+# 入库的：flake.nix / flake.lock / modules / home / hosts / pipeline / vendor
+#         .github / README.md / LICENSE / .gitignore
+# 挡掉的：本地工具（tests/ scripts/）、构建产物、VM 镜像、密钥、日志、临时文件。
+#
+# tests/ 和 scripts/ 留在本地磁盘上照常能用，只是不进版本库：
+#   tests/    VM 验证工具（uinput 虚拟鼠标、libinput live-load 探针）
+#   scripts/  一次性迁移脚本、VM 启动脚本、推送脚本
+# 这样别人 clone 下来拿到的是纯净的 Nix 配置，本地该有的工具一个不少。
+#
+# 检查有没有漏网（被 .gitignore 命中却仍被跟踪的文件）：
+#   git ls-files -ci --exclude-standard
+# 推送脚本 scripts/push.sh 会强制跑这个检查。
+# ==============================================================================
+
+# ── 本地工具（不进版本库，但保留在磁盘上）────────────────────────────────────
+/tests/
+/scripts/
+
+# ── Nix 构建产物 ──────────────────────────────────────────────────────────────
+# `nix build` 生成的 result 符号链接，指向 /nix/store
+/result
+/result-*
+# 带 -o 指定输出名时可能落在任意位置
+result
+
+# ── VM 镜像（几十 GB，绝不入库）──────────────────────────────────────────────
+*.raw
+*.qcow2
+*.img
+*.vdi
+*.vmdk
+*.iso
+
+# ── 本地开发环境 ──────────────────────────────────────────────────────────────
+.direnv/
+.envrc
+.pre-commit-config.yaml
+
+# ── 密钥 / 凭据（绝不入库）───────────────────────────────────────────────────
+# VM 测试用的 SSH key（hosts/username-vm/default.nix 里只放公钥）
+.vm-key/
+# GitHub token 等
+*.token
+*.secret
+.env
+.env.*
+!.env.example
+# SSH / GPG / 云凭据
+id_rsa*
+id_ed25519*
+*.pem
+*.key
+*.p12
+.ssh/
+.gnupg/
+.aws/
+.netrc
+.git-credentials
+
+# ── 日志 / 缓存 ──────────────────────────────────────────────────────────────
+*.log
+**/logs/
+.cache/
+__pycache__/
+*.pyc
+node_modules/
+
+# ── 编辑器 / 系统临时文件 ────────────────────────────────────────────────────
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# ── 补丁残留 / 备份 ──────────────────────────────────────────────────────────
+*.orig
+*.rej
+*.bak
+*.bak.*

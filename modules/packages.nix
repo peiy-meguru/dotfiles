@@ -1,0 +1,36 @@
+{ pkgs, ... }: {
+  environment.systemPackages = with pkgs; [
+    git
+    curl
+    wget
+    rsync
+    unzip
+    unrar
+    pv
+    ripgrep
+    fd
+    jq
+    btop
+    fastfetch
+    micro
+    vim
+    tmux
+    kitty
+    alacritty
+    wlsunset
+    cliphist
+    mpvpaper
+    eza
+    fzf
+    bat
+    qt6Packages.fcitx5-configtool
+    xdg-utils
+    glib
+    playerctl
+    brightnessctl
+    pavucontrol
+    nautilus
+    firefox
+    libnotify
+  ];
+}

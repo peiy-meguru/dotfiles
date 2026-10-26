@@ -1,0 +1,14 @@
+layout {
+    background-color "transparent"
+
+    // 窗口间距。niri 默认 16，这里收紧到 8 —— 窗口更大，视觉上更贴近
+    // 顶部栏缩到 thickness 30 之后的整体比例。
+    gaps 8
+
+    // 负 strut：niri 的 struts 是「在 layer-shell 占位之外再加外间距」，
+    // 给负值就是往回缩。这里往上顶 8px，抵掉 bar 的 margin_edge = 4
+    // 加上胶囊内边距，让窗口区尽量吃满屏幕。
+    struts {
+        top -8
+    }
+}

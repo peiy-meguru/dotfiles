@@ -1,0 +1,7 @@
+{
+  "repo": "ech678/Nyxuri",
+  "rev": "ebafe03c9bdf1291eeb83d0f8c368d40a63ccdfd",
+  "url": "https://github.com/ech678/Nyxuri",
+  "generatedBy": "pipeline/materialize.sh",
+  "note": "自动生成，勿手改。刷新：./pipeline/materialize.sh --rev <sha>"
+}

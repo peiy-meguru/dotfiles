@@ -1,0 +1,21 @@
+# 自动升级 CI 里按 SHA 固定的 GitHub Actions。
+#
+# ci.yml 里的 action 全部固定到 commit SHA（供应链安全），
+# 代价是不会自动跟进新版本。Dependabot 每周提一次 PR，
+# 把 SHA 和后面的 tag 注释一起更新。
+#
+# 想关掉：删掉这个文件即可（CI 照常跑，只是 action 不会自动升级）。
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    # 新版本发布后等 7 天再提 PR，避开刚发布就被投毒的窗口
+    cooldown:
+      default-days: 7
+    commit-message:
+      prefix: "ci"
+    labels:
+      - dependencies
+      - ci
