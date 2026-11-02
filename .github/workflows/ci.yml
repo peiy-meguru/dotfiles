@@ -99,7 +99,7 @@ jobs:
           persist-credentials: false
 
       # cachix/install-nix-action@v30
-      - uses: cachix/install-nix-action@08dcb3a5e62fa31e2da3d490afc4176ef55ecd72
+      - uses: cachix/install-nix-action@75c75c31ebece974e48ebc36b4ad125bd97bd97b
         with:
           # 不装 nixpkgs channel：本仓库只用 flake
           nix_path: nixpkgs=unset
@@ -132,7 +132,7 @@ jobs:
           persist-credentials: false
 
       # cachix/install-nix-action@v30
-      - uses: cachix/install-nix-action@08dcb3a5e62fa31e2da3d490afc4176ef55ecd72
+      - uses: cachix/install-nix-action@75c75c31ebece974e48ebc36b4ad125bd97bd97b
         with:
           nix_path: nixpkgs=unset
 
@@ -167,7 +167,7 @@ jobs:
           persist-credentials: false
 
       # cachix/install-nix-action@v30
-      - uses: cachix/install-nix-action@08dcb3a5e62fa31e2da3d490afc4176ef55ecd72
+      - uses: cachix/install-nix-action@75c75c31ebece974e48ebc36b4ad125bd97bd97b
         with:
           nix_path: nixpkgs=unset
 
@@ -211,7 +211,7 @@ jobs:
           persist-credentials: false
 
       # cachix/install-nix-action@v30
-      - uses: cachix/install-nix-action@08dcb3a5e62fa31e2da3d490afc4176ef55ecd72
+      - uses: cachix/install-nix-action@75c75c31ebece974e48ebc36b4ad125bd97bd97b
         with:
           nix_path: nixpkgs=unset
 
